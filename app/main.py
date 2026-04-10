@@ -27,7 +27,7 @@ async def analyze_resume(file: UploadFile = File(...), job_skills: str = Form(No
         "image/jpeg",
         "image/bmp",
         "image/tiff",
-    ]
+    ] 
 
     if file.content_type not in supported_types:
         raise HTTPException(status_code=400, detail="Supported formats: PDF, DOCX, DOC, TXT, PNG, JPG, BMP, TIFF")
