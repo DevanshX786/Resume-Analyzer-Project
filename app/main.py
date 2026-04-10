@@ -1,4 +1,5 @@
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -7,6 +8,14 @@ from .resume_analyzer import extract_text_from_file, extract_sections, extract_s
 
 # Core app instance
 app = FastAPI(title="ResumeAnalyzer", version="1.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # For production, replace with specific origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Health check endpoint
 @app.get("/")

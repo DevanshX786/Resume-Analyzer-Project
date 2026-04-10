@@ -71,28 +71,46 @@ def normalize_text(text: str) -> str:
 # Identify common resume sections like education, experience, skills, and projects.
 # This supports project B: section extraction, ready for more detailed parsing later.
 def extract_sections(text: str) -> Dict[str, str]:
-    # Normalize to make matching simpler and maintain relative positions.
-    normalized = text.lower()
+    # Use lowercase for matching but keep original text for extraction
+    text_lower = text.lower()
     section_headers = ["experience", "education", "skills", "projects", "certifications", "summary", "objective"]
-    lines = [line.strip() for line in normalized.splitlines() if line.strip()]
-
+    
+    # Track the start index of each section
+    found_sections = []
+    for header in section_headers :
+        # Match header at start of line or with a bit of prefix (like icons)
+        match = re.search(r"(?i)^\\s*(?:[\\W_]*)\\s*" + re.escape(header), text, re.MULTILINE)
+        if match:
+            found_sections.append((match.start(), header))
+    
+    # Sort by appearance in the text
+    found_sections.sort()
+    
     sections = {header: "" for header in section_headers}
-    current_section = None
-
-    for line in lines:
-        for header in section_headers:
-            if line.startswith(header):
-                current_section = header
-                sections[current_section] = line + "\n"
-                break
-        else:
-            if current_section:
-                # Keep appending lines until the next known section header appears
-                sections[current_section] += line + "\n"
-
-    # Trim whitespace from section contents
-    for k, v in sections.items():
-        sections[k] = v.strip()
+    
+    for i in range(len(found_sections)):
+        start_idx, header = found_sections[i]
+        end_idx = found_sections[i+1][0] if i+1 < len(found_sections) else len(text)
+        
+        # Extract from original text
+        section_raw = text[start_idx:end_idx].strip()
+        
+        # Better header removal: find the first actual content line
+        lines = section_raw.splitlines()
+        if lines:
+            # If the first line is mostly just the header, remove it
+            first_line = lines[0].lower()
+            if header in first_line and len(first_line) < len(header) + 5:
+                content = "\n".join(lines[1:]).strip()
+            else:
+                # Header might be at the start of the first line
+                content = re.sub(r"(?i)^\\s*(?:[\\W_]*)\\s*" + re.escape(header) + r"[:\\s-]*", "", section_raw, count=1).strip()
+            
+            # Final Cleanup: If it's still very lowercase, let's at least capitalize lines
+            if content.islower():
+                content = "\n".join([line.capitalize() for line in content.splitlines()])
+                
+            sections[header] = content
 
     return sections
 

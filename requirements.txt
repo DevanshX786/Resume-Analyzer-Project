@@ -7,3 +7,6 @@ pydantic
 pillow
 pytesseract
 python-multipart
+streamlit
+plotly
+requests
