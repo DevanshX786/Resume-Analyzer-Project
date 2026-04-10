@@ -129,7 +129,8 @@ import os
 
 # --- Utility Functions ---
 def call_analyze_api(file, job_skills=""):
-    base_url = os.environ.get("BACKEND_URL", "http://localhost:8000").rstrip("/")
+    # If explicitly set in Streamlit Cloud, it uses that; otherwise connects to the live Render API
+    base_url = os.environ.get("BACKEND_URL", "https://resume-analyzer-e6s3.onrender.com").rstrip("/")
     url = f"{base_url}/analyze"
     files = {"file": (file.name, file.getvalue(), file.type)}
     data = {"job_skills": job_skills}
