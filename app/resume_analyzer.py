@@ -29,6 +29,7 @@ if GEMINI_API_KEY:
 MONGODB_URI = os.environ.get("MONGODB_URI", "mongodb://127.0.0.1:27017")
 MONGODB_DB_NAME = os.environ.get("MONGODB_DB_NAME", "resume_analyzer")
 MONGODB_COLLECTION = os.environ.get("MONGODB_COLLECTION", "role_cache")
+MONGODB_LEGACY_COLLECTION = os.environ.get("MONGODB_LEGACY_COLLECTION", "role_skills_cache")
 MONGODB_MASTER_COLLECTION = os.environ.get("MONGODB_MASTER_COLLECTION", "role_skills_master")
 ROLE_CACHE_TTL_DAYS = int(os.environ.get("ROLE_CACHE_TTL_DAYS", "90"))
 ROLE_CACHE_FAILURE_TTL_MINUTES = int(os.environ.get("ROLE_CACHE_FAILURE_TTL_MINUTES", "60"))
@@ -82,6 +83,7 @@ IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".tif"}
 
 _mongo_client: Optional[MongoClient] = None
 _role_cache_collection: Optional[Collection] = None
+_legacy_role_cache_collection: Optional[Collection] = None
 _role_master_collection: Optional[Collection] = None
 
 
@@ -125,7 +127,7 @@ def _sanitize_skills(skills: List[str]) -> List[str]:
 
 
 def _get_role_cache_collection() -> Optional[Collection]:
-    global _mongo_client, _role_cache_collection, _role_master_collection
+    global _mongo_client, _role_cache_collection, _legacy_role_cache_collection, _role_master_collection
 
     if _role_cache_collection is not None and _role_master_collection is not None:
         return _role_cache_collection
@@ -140,6 +142,13 @@ def _get_role_cache_collection() -> Optional[Collection]:
         cache_collection.create_index([("expires_at", ASCENDING)], expireAfterSeconds=0)
         _role_cache_collection = cache_collection
 
+        # Backward compatibility: allow reads from legacy cache collection.
+        if MONGODB_LEGACY_COLLECTION and MONGODB_LEGACY_COLLECTION != MONGODB_COLLECTION:
+            legacy_collection = db[MONGODB_LEGACY_COLLECTION]
+            legacy_collection.create_index([("role_key", ASCENDING)], unique=True)
+            legacy_collection.create_index([("expires_at", ASCENDING)], expireAfterSeconds=0)
+            _legacy_role_cache_collection = legacy_collection
+
         master_collection = db[MONGODB_MASTER_COLLECTION]
         master_collection.create_index([("role_key", ASCENDING)], unique=True)
         _role_master_collection = master_collection
@@ -149,6 +158,7 @@ def _get_role_cache_collection() -> Optional[Collection]:
     except PyMongoError as e:
         print(f"MongoDB unavailable, continuing without cache: {e}")
         _role_cache_collection = None
+        _legacy_role_cache_collection = None
         _role_master_collection = None
         return None
 
@@ -191,16 +201,31 @@ def _get_cached_role_skills(role_key: str) -> Optional[List[str]]:
         return None
 
     now = _utcnow()
-    doc = collection.find_one(
-        {"role_key": {"$in": _role_key_variants(role_key)}, "expires_at": {"$gt": now}}
-    )
+    query = {"role_key": {"$in": _role_key_variants(role_key)}, "expires_at": {"$gt": now}}
+    doc = collection.find_one(query)
+    source_collection = collection
+
+    if not doc and _legacy_role_cache_collection is not None:
+        doc = _legacy_role_cache_collection.find_one(query)
+        source_collection = _legacy_role_cache_collection
+
     if not doc:
         return None
 
-    collection.update_one(
+    source_collection.update_one(
         {"_id": doc["_id"]},
         {"$set": {"last_used_at": now}, "$inc": {"hit_count": 1}},
     )
+
+    # Opportunistically migrate legacy cache entry into the primary cache collection.
+    if source_collection is not collection:
+        _save_role_skills(
+            role_key=str(doc.get("role_key", role_key)),
+            display_role=str(doc.get("display_role", role_key)),
+            skills=_sanitize_skills(doc.get("skills", [])),
+            source=str(doc.get("source", "legacy_cache")),
+        )
+
     return _sanitize_skills(doc.get("skills", []))
 
 
@@ -209,7 +234,10 @@ def _get_stale_cached_role_skills(role_key: str) -> Optional[List[str]]:
     if collection is None:
         return None
 
-    doc = collection.find_one({"role_key": {"$in": _role_key_variants(role_key)}})
+    query = {"role_key": {"$in": _role_key_variants(role_key)}}
+    doc = collection.find_one(query)
+    if not doc and _legacy_role_cache_collection is not None:
+        doc = _legacy_role_cache_collection.find_one(query)
     if not doc:
         return None
     return _sanitize_skills(doc.get("skills", []))
