@@ -8,6 +8,20 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.0
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB_NAME
+        value: resume_analyzer
+      - key: MONGODB_COLLECTION
+        value: role_cache
+      - key: MONGODB_MASTER_COLLECTION
+        value: role_skills_master
+      - key: ROLE_CACHE_TTL_DAYS
+        value: "30"
+      - key: ROLE_CACHE_FAILURE_TTL_MINUTES
+        value: "15"
 
   # Frontend (Streamlit)
   - type: web
