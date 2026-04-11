@@ -129,8 +129,8 @@ import os
 
 # --- Utility Functions ---
 def call_analyze_api(file, job_skills=""):
-    # Prefer local API for local development; deployment can override with BACKEND_URL.
-    base_url = os.environ.get("BACKEND_URL", "http://127.0.0.1:8000").rstrip("/")
+    # Prefer configured BACKEND_URL; fallback to deployed Render backend.
+    base_url = os.environ.get("BACKEND_URL", "https://resume-analyzer-e6s3.onrender.com").rstrip("/")
     url = f"{base_url}/analyze"
     files = {"file": (file.name, file.getvalue(), file.type)}
     data = {"job_skills": job_skills}
