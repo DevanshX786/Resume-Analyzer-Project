@@ -12,6 +12,7 @@ from rapidfuzz import process, fuzz
 import google.generativeai as genai
 import os
 import json
+import ast
 from dotenv import load_dotenv
 from pymongo import ASCENDING, MongoClient
 from pymongo.collection import Collection
@@ -311,6 +312,35 @@ def _save_role_skills(role_key: str, display_role: str, skills: List[str], sourc
     )
 
 
+def _parse_skill_list_response(text: str) -> List[str]:
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return []
+
+    # Remove common markdown code fences first.
+    cleaned = cleaned.replace("```json", "").replace("```", "").strip()
+
+    candidates = [cleaned]
+    first_bracket = cleaned.find("[")
+    last_bracket = cleaned.rfind("]")
+    if first_bracket != -1 and last_bracket != -1 and last_bracket > first_bracket:
+        candidates.append(cleaned[first_bracket:last_bracket + 1])
+
+    for candidate in candidates:
+        try:
+            parsed = json.loads(candidate)
+        except Exception:
+            try:
+                parsed = ast.literal_eval(candidate)
+            except Exception:
+                continue
+
+        if isinstance(parsed, list) and parsed:
+            return [str(item).strip().lower() for item in parsed if str(item).strip()]
+
+    return []
+
+
 def resolve_requested_skills(job_skills: str) -> List[str]:
     clean_input = (job_skills or "").strip()
     if not clean_input:
@@ -552,10 +582,11 @@ def get_dynamic_skills_from_ai(role_name: str) -> List[str]:
             prompt,
             generation_config={"temperature": 0.1, "max_output_tokens": 120},
         )
-        text = response.text.replace("```json", "").replace("```", "").strip()
-        skills = json.loads(text)
-        if isinstance(skills, list) and len(skills) > 0:
-            return [str(s).strip().lower() for s in skills]
+        text = getattr(response, "text", "") or ""
+        skills = _parse_skill_list_response(text)
+        if skills:
+            return skills
+        print(f"Agentic AI returned unparseable content for role '{role_name}': {text[:200]!r}")
         return []
     except Exception as e:
         print(f"Agentic AI Failed: {e}")
