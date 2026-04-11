@@ -4,6 +4,10 @@ ResumeAnalyzer is a FastAPI + Streamlit application that analyzes resumes, compa
 
 For custom specializations, the app uses Gemini to generate core skills and caches them in MongoDB for faster reuse.
 
+## 🚀 Try It Out
+
+**[Launch ResumeAnalyzer Live](https://resume-analyzer-devansh.streamlit.app/)** — Start comparing your resume to any role instantly, no installation required!
+
 ## Features
 - Resume parsing for PDF, DOCX/DOC, TXT, and image files.
 - Skill extraction using keyword and fuzzy matching.
