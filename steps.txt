@@ -1,51 +1,22 @@
-Step 1: Commit and push latest code
-1) git add .
-2) git commit -m "agentic ai + mongodb cache deployment fixes"
-3) git push
+Step 1: Setup environment
+python -m venv .venv
+.\.venv\Scripts\activate
+pip install -r requirements.txt
 
-Step 2: Configure Render backend environment (resume-analyzer-api)
-Add these keys in Render -> Service -> Environment:
-PYTHON_VERSION=3.12.0
-GEMINI_API_KEY=YOUR_GEMINI_KEY
-MONGODB_URI=YOUR_MONGODB_ATLAS_URI
-MONGODB_DB_NAME=resume_analyzer
-MONGODB_COLLECTION=role_cache
-MONGODB_LEGACY_COLLECTION=role_skills_cache
-MONGODB_MASTER_COLLECTION=role_skills_master
-ROLE_CACHE_TTL_DAYS=30
-ROLE_CACHE_FAILURE_TTL_MINUTES=15
+Step 2: Run and verify API
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+Visit: http://localhost:8000/docs
 
-Step 3: Configure Render frontend environment (resume-analyzer-ui)
-Add/update these keys:
-PYTHON_VERSION=3.12.0
-BACKEND_URL=https://resume-analyzer-e6s3.onrender.com
+Step 3: Manual API test
+POST /analyze with a resume file
+optional job_skills=python,aws,sql
+confirm JSON output has:
+profile
+skills
+feedback
 
-Step 4: Force clean deploy
-1) Open backend service
-2) Manual Deploy -> Clear build cache & deploy
-3) Wait for status to become Live
-4) Do the same for frontend service
-
-Step 5: Verify backend directly
-1) Open https://resume-analyzer-e6s3.onrender.com/docs
-2) Call POST /analyze with a text resume file
-3) Set job_skills=ios dev
-4) Confirm requested_skills is NOT empty
-
-Step 6: Verify frontend
-1) Open deployed Streamlit URL
-2) Upload resume
-3) Use Custom Role = ios dev (or another custom role)
-4) Confirm no "Required skills could not be fetched right now" message
-
-Step 7: Verify Mongo cache behavior
-1) Open MongoDB Compass -> resume_analyzer -> role_cache
-2) Find role_key = ios developer (or your custom role)
-3) Confirm skills array exists and is not empty
-4) Re-run same role from app and confirm hit_count increases
-
-Step 8: If custom role still fails
-1) Recheck backend env vars for typos
-2) Confirm backend is calling correct DB + collection values
-3) Redeploy backend with Clear build cache again
-4) Re-test /analyze from docs before testing frontend
+Step 4: Add improvements iteratively
+a) refine extraction sections (education, experience, projects)
+b) add “experience years” calculator
+c) add “missing skill recommendations”
+d) add “readability + keyword density”

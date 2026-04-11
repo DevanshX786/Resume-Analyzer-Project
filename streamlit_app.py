@@ -126,14 +126,11 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
 
 # --- Utility Functions ---
 def call_analyze_api(file, job_skills=""):
-    # Use configured BACKEND_URL when provided; default to local API for local runs.
-    base_url = os.environ.get("BACKEND_URL", "http://127.0.0.1:8000").rstrip("/")
+    # Prefer configured BACKEND_URL; fallback to deployed Render backend.
+    base_url = os.environ.get("BACKEND_URL", "https://resume-analyzer-e6s3.onrender.com").rstrip("/")
     url = f"{base_url}/analyze"
     files = {"file": (file.name, file.getvalue(), file.type)}
     data = {"job_skills": job_skills}
