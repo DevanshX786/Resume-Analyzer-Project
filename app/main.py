@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from .resume_analyzer import extract_text_from_file, extract_sections, extract_skills, give_feedback, ROLE_SKILLS, suggest_roles
+from .resume_analyzer import extract_text_from_file, extract_sections, extract_skills, give_feedback, suggest_roles, resolve_requested_skills
 
 # Core app instance
 app = FastAPI(title="ResumeAnalyzer", version="1.0")
@@ -60,13 +60,7 @@ async def analyze_resume(file: UploadFile = File(...), job_skills: str = Form(No
     # Studio: Skill matching using word lookup + fuzzy logic
     detected_skills = extract_skills(normalized_text)
 
-    requested_skills = []
-    if job_skills:
-        clean_job = job_skills.strip().lower()
-        if clean_job in ROLE_SKILLS:
-            requested_skills = ROLE_SKILLS[clean_job]
-        else:
-            requested_skills = [skill.strip().lower() for skill in job_skills.split(",")]
+    requested_skills = resolve_requested_skills(job_skills) if job_skills else []
 
     missing_skills = [skill for skill in requested_skills if skill and skill not in [s.lower() for s in detected_skills]]
 

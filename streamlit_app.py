@@ -129,8 +129,8 @@ import os
 
 # --- Utility Functions ---
 def call_analyze_api(file, job_skills=""):
-    # If explicitly set in Streamlit Cloud, it uses that; otherwise connects to the live Render API
-    base_url = os.environ.get("BACKEND_URL", "https://resume-analyzer-e6s3.onrender.com").rstrip("/")
+    # Prefer local API for local development; deployment can override with BACKEND_URL.
+    base_url = os.environ.get("BACKEND_URL", "http://127.0.0.1:8000").rstrip("/")
     url = f"{base_url}/analyze"
     files = {"file": (file.name, file.getvalue(), file.type)}
     data = {"job_skills": job_skills}
@@ -206,13 +206,18 @@ with cfg_col1:
 
 with cfg_col2:
     if selected_role == "Custom Role":
-        custom_skills = st.text_input("Define Custom Skills", placeholder="e.g. Kotlin, Unity, C#...")
+        custom_skills = st.text_input("Enter Job Title", placeholder="e.g. Cloud Architect, DevOps...")
+        st.caption("✨ *Agentic AI will dynamically fetch core skills for this role*")
     else:
         custom_skills = predefined_roles[selected_role]
 
 st.markdown("<br>", unsafe_allow_html=True)
 st.markdown('#### 📄 Document Upload')
-uploaded_file = st.file_uploader("", type=["pdf", "docx", "txt", "png", "jpg", "jpeg"])
+uploaded_file = st.file_uploader(
+    "Upload Resume",
+    type=["pdf", "docx", "txt", "png", "jpg", "jpeg"],
+    label_visibility="collapsed",
+)
 
 if uploaded_file:
     if st.button("🚀 INITIATE ANALYSIS"):
@@ -240,7 +245,12 @@ if 'analysis_result' in st.session_state:
 
         with col2:
             skills_html = "".join([f'<span class="badge badge-match">{s}</span>' for s in res["detected_skills"]]) if res["detected_skills"] else "<p style='color:#e74c3c;'>No core competencies identified from tokens.</p>"
-            missing_html = "".join([f'<span class="badge badge-missing">{s}</span>' for s in res["missing_skills"]]) if res["missing_skills"] else "<p style='color:#2ecc71;'>Complete profile match detected!</p>"
+            if not res.get("requested_skills"):
+                missing_html = "<p style='color:#f39c12;'>Required skills could not be fetched right now. Try again in a moment.</p>"
+            elif res.get("missing_skills"):
+                missing_html = "".join([f'<span class="badge badge-missing">{s}</span>' for s in res["missing_skills"]])
+            else:
+                missing_html = "<p style='color:#2ecc71;'>Complete profile match detected!</p>"
             
             inventory_html = f"""
             <div class="glass-card" style="height: 100%;">
